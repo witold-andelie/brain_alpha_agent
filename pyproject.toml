@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "brain-alpha-agent"
 version = "0.1.0"
@@ -9,9 +13,9 @@ dependencies = []
 brain-alpha = "brain_alpha_agent.cli:main"
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
-brain = ["requests>=2.31"]
-research = ["requests>=2.31", "scrapling[fetchers]>=0.4.9"]
+test = ["pytest>=8,<10"]
+brain = ["requests>=2.32.4,<3"]
+research = ["requests>=2.32.4,<3"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

@@ -37,12 +37,19 @@ def test_brain_client_uses_injected_session_for_read_only_requests() -> None:
         fields=FakeResponse(
             payload={
                 "results": [
-                    {"id": "roic", "description": "Return on invested capital", "dataset": {"id": "fundamental"}}
+                    {
+                        "id": "roic",
+                        "description": "Return on invested capital",
+                        "dataset": {"id": "fundamental"},
+                    }
                 ]
             }
         )
     )
-    client = BrainClient(BrainConfig(base_url="https://example.test", username="user", password="pass"), session=session)
+    client = BrainClient(
+        BrainConfig(base_url="https://example.test", username="user", password="pass"),
+        session=session,
+    )
 
     client.authenticate()
     fields = client.get_data_fields(search="roic", dataset_id="fundamental", limit=1)
@@ -51,7 +58,12 @@ def test_brain_client_uses_injected_session_for_read_only_requests() -> None:
     assert session.auth == ("user", "pass")
     assert session.calls == [
         ("POST", "https://example.test/authentication", 30),
-        ("GET", "https://example.test/data-fields", {"limit": 1, "search": "roic", "dataset.id": "fundamental"}, 30),
+        (
+            "GET",
+            "https://example.test/data-fields",
+            {"limit": 1, "search": "roic", "dataset.id": "fundamental"},
+            30,
+        ),
     ]
 
 
@@ -66,3 +78,13 @@ def test_brain_client_rejects_failed_authentication() -> None:
 def test_brain_client_requires_credentials() -> None:
     with pytest.raises(RuntimeError, match="BRAIN_USERNAME and BRAIN_PASSWORD"):
         BrainClient(session=FakeSession())
+
+
+def test_brain_client_requires_https_base_url() -> None:
+    with pytest.raises(ValueError, match="absolute HTTPS"):
+        BrainClient(
+            BrainConfig(
+                base_url="http://example.test", username="user", password="pass"
+            ),
+            session=FakeSession(),
+        )

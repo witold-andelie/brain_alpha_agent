@@ -83,7 +83,9 @@ py -3 -m brain_alpha_agent fields --search roic --limit 20
 py -3 -m brain_alpha_agent --db data/brain_alpha.db generate `
   --region USA `
   --universe TOP3000 `
-  --delay 1
+  --delay 1 `
+  --neutralization SUBINDUSTRY `
+  --profile robust
 ```
 
 命令会输出候选 Alpha ID。先记下需要研究的 ID，例如：
@@ -92,7 +94,10 @@ py -3 -m brain_alpha_agent --db data/brain_alpha.db generate `
 ALPHA_ID=输出中的某个ID
 ```
 
-当前候选来自 value/quality、growth/quality、mean reversion、volume confirmation 和 low volatility 五个模板家族。格式化重复公式会自动去重。
+默认 `robust` profile 生成 8 个受控候选，包括基础 value/quality、growth/quality、
+mean reversion、volume confirmation、low volatility，以及 smoothed reversion、
+slow momentum defensive 和 fundamental anchor。`baseline` 保留原始 5 个候选，
+`whipsaw` 只生成 4 个甩尾/压力候选。格式化重复公式会自动去重。
 
 ## 5. 校验候选公式
 
@@ -148,6 +153,7 @@ py -3 -m brain_alpha_agent validate "rank(zscore(roic))"
 py -3 -m brain_alpha_agent --db data/brain_alpha.db simulate `
   ALPHA_ID `
   --payload simulation.json `
+  --regime baseline `
   --timeout 600 `
   --poll-interval 5
 ```
@@ -157,11 +163,12 @@ py -3 -m brain_alpha_agent --db data/brain_alpha.db simulate `
 ```text
 读取 SQLite 中的 Alpha
 -> 读取本地 JSON
+-> 确认 payload 包含该 Alpha 的精确公式
 -> BRAIN 认证
 -> POST /simulations
 -> 轮询状态
 -> 解析结果
--> 保存原始响应和标准化指标
+-> 追加保存候选快照、请求、场景、来源、原始响应和标准化指标
 ```
 
 第一次真实调用只使用一个 Alpha、一个小范围场景，并人工确认返回结果。确认请求格式和响应字段正确后，再进行批量研究。
@@ -173,25 +180,32 @@ py -3 -m brain_alpha_agent --db data/brain_alpha.db simulate `
 ```json
 [
   {
+    "regime": "baseline",
     "region": "USA",
     "universe": "TOP3000",
     "delay": 1,
     "neutralization": "SUBINDUSTRY"
   },
   {
+    "regime": "whipsaw",
     "region": "USA",
     "universe": "TOP1000",
     "delay": 1,
     "neutralization": "INDUSTRY"
   },
   {
+    "regime": "stress",
     "region": "USA",
     "universe": "TOP3000",
-    "delay": 5,
+    "delay": 0,
     "neutralization": "SUBINDUSTRY"
   }
 ]
 ```
+
+`regime` 是审计标签，不会自动改变 BRAIN 的回测窗口。`whipsaw` 场景必须在已核对的
+官方 payload 模板中映射到真实不同的快速反转日期窗口或设置。仅复制同一场景并更改
+标签会被 material scenario fingerprint 拒绝。
 
 批量研究一个 Alpha：
 
@@ -200,6 +214,7 @@ py -3 -m brain_alpha_agent --db data/brain_alpha.db research `
   --alpha-id ALPHA_ID `
   --payload-template payload-template.json `
   --scenarios scenarios.json `
+  --max-runs 50 `
   --timeout 600 `
   --poll-interval 5
 ```
@@ -227,15 +242,19 @@ py -3 -m brain_alpha_agent --db data/brain_alpha.db research `
 py -3 -m brain_alpha_agent --db data/brain_alpha.db assess ALPHA_ID
 ```
 
-默认要求至少 3 个真实完成场景，并检查：
+默认要求至少 3 个真实、有效且实质不同的完成场景，并检查：
 
+- 场景必须包含 `baseline` 和 `whipsaw` 状态；
+- result provenance 必须由真实 `brain` adapter 写入；
 - 每个场景都有 Sharpe、Fitness、Turnover、Drawdown 和 Coverage。
+- 所有指标必须为有限数，Coverage 必须有有效 universe 分母且位于 0-1；
 - Sharpe 不低于 `1.0`。
 - Fitness 不低于 `0.5`。
 - Turnover 不高于 `0.8`。
 - Drawdown 不高于 `0.25`。
 - Coverage 不低于 `0.5`。
 - 多场景 Sharpe 波动不能过大。
+- baseline 到 whipsaw 的 Sharpe 下降和 whipsaw Turnover 不能过大。
 - 若平台返回与已有 Alpha 的相关性，绝对值不能高于 `0.8`。
 - mock/offline 结果永远不能通过。
 
@@ -245,7 +264,9 @@ py -3 -m brain_alpha_agent --db data/brain_alpha.db assess ALPHA_ID
 py -3 -m brain_alpha_agent --db data/brain_alpha.db assess ALPHA_ID --min-scenarios 5
 ```
 
-`passed: true` 只表示通过当前硬门槛，不等于高质量、Gold 或可交易。仍必须人工检查经济逻辑、数据更新频率、行业暴露、样本外表现、因子相关性和平台完整结果。
+每次 assessment 都会持久化，并成为 `rank` 的正式数据源。mock 分数会明确标记，
+不会覆盖真实排名。`passed: true` 只表示通过当前硬门槛，不等于 Gold 或可交易。
+仍必须人工检查经济逻辑、数据更新频率、行业暴露、样本外表现和平台完整结果。
 
 ## 10. 查看结果和数据库状态
 
@@ -299,6 +320,7 @@ Remove-Item Env:MOLTBOOK_API_KEY -ErrorAction SilentlyContinue
 
 ```powershell
 py -3 -m brain_alpha_agent --db data/mock.db generate --region USA --universe TOP3000 --delay 1
+py -3 -m brain_alpha_agent --db data/mock.db simulate ALPHA_ID --payload simulation.json --regime baseline --offline
 py -3 -m brain_alpha_agent --db data/mock.db evaluate ALPHA_ID
 py -3 -m brain_alpha_agent --db data/mock.db rank
 ```

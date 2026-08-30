@@ -33,10 +33,12 @@ https://www.nber.org/papers/w20592
 
 ## 已落实到代码的规则
 
-- 所有 simulation 原始响应和标准化指标都写入 SQLite。
-- `assess` 默认要求至少三个场景。
+- 所有 simulation 的候选快照、请求、场景、来源、原始响应和标准化指标都追加写入 SQLite。
+- payload 必须包含所选候选的精确公式，scenario 不能覆盖候选身份字段。
+- `assess` 默认要求至少三个实质不同的真实场景，并同时包含 baseline 和 whipsaw。
 - 检查 Sharpe、Fitness、Turnover、Drawdown 和 Coverage。
-- 检查多场景 Sharpe 稳定性。
+- 拒绝非有限指标、无分母 Coverage、未知来源、mock/offline 和重复场景。
+- 检查多场景 Sharpe 稳定性、whipsaw Sharpe 衰减和 whipsaw Turnover。
 - 对已有 Alpha 相关性超过阈值的结果拒绝通过。
 - 对只改变空格或大小写的公式做规范化去重。
 - Moltbook 内容以低置信度 `KnowledgeItem` 保存，并保留来源 URL。
@@ -45,6 +47,7 @@ https://www.nber.org/papers/w20592
 ## 仍需完成
 
 - 用官方真实结果区分训练期、验证期和样本外期。
+- 自动检测 change point，并把真实日期窗口标记为 trend、whipsaw 和 stress。
 - 保存每次尝试和失败原因，控制多重检验偏差。
 - 增加候选之间的相关性矩阵和重复因子淘汰。
 - 增加 region、universe、neutralization、delay 和时间窗口的批量场景运行。
