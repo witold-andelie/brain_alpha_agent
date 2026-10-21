@@ -17,8 +17,33 @@ dist/
 .env.*
 !.env.example
 
+# Local credentials and private keys
+.aws/
+.ssh/
+.netrc
+.pypirc
+credentials.json
+credentials.*.json
+secrets.json
+secrets.*.json
+secrets.yaml
+secrets.yml
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+
 .codegraph/
 data/*.db
+data/*.db-*
+data/*.sqlite*
 
 .DS_Store
 Thumbs.db
